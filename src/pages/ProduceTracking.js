@@ -20,7 +20,7 @@ import QRCode from 'qrcode.react';
 
 const ProduceTracking = () => {
   const [searchParams] = useSearchParams();
-  const { produceItems, getProduceHistory } = useBlockchain();
+  const { produceItems } = useBlockchain();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
   const [filteredItems, setFilteredItems] = useState([]);

@@ -4,20 +4,18 @@ import { useBlockchain } from '../context/BlockchainContext';
 import { 
   Plus, 
   Search, 
-  Filter, 
   Eye, 
   Edit, 
   TrendingUp, 
   Package, 
   Users, 
   DollarSign,
-  Calendar,
   MapPin,
   Leaf
 } from 'lucide-react';
 
 const Dashboard = () => {
-  const { produceItems, account, isConnected } = useBlockchain();
+  const { produceItems, isConnected } = useBlockchain();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 

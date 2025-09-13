@@ -7,9 +7,7 @@ import {
   TrendingUp, 
   Users, 
   Globe, 
-  Zap,
-  ArrowRight,
-  CheckCircle
+  ArrowRight
 } from 'lucide-react';
 
 const Home = () => {

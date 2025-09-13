@@ -5,7 +5,6 @@ import {
   Leaf, 
   Upload, 
   MapPin, 
-  Calendar, 
   DollarSign, 
   Package,
   CheckCircle,

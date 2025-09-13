@@ -57,7 +57,7 @@ export const BlockchainProvider = ({ children }) => {
 
   useEffect(() => {
     setProduceItems(mockProduceItems);
-  }, []);
+  }, []); // Remove mockProduceItems dependency to prevent infinite re-renders
 
   const connectWallet = async () => {
     try {
@@ -86,10 +86,13 @@ export const BlockchainProvider = ({ children }) => {
 
   const addProduceItem = async (produceData) => {
     try {
+      console.log('Adding produce item:', produceData);
+      
       // In a real app, this would interact with smart contracts
       const newItem = {
         id: Date.now().toString(),
         ...produceData,
+        status: 'Harvested', // Add default status
         blockchainHash: `0x${Math.random().toString(16).substr(2, 8)}...`,
         qrCode: `https://example.com/qr/${Date.now()}`,
         history: [
@@ -101,7 +104,14 @@ export const BlockchainProvider = ({ children }) => {
         ]
       };
       
-      setProduceItems(prev => [...prev, newItem]);
+      console.log('New item created:', newItem);
+      
+      setProduceItems(prev => {
+        const updated = [...prev, newItem];
+        console.log('Updated produce items:', updated);
+        return updated;
+      });
+      
       return newItem;
     } catch (error) {
       console.error('Error adding produce item:', error);

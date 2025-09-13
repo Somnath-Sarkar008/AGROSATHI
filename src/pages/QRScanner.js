@@ -1,9 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBlockchain } from '../context/BlockchainContext';
+import QrScanner from 'qr-scanner';
+import QRCode from 'qrcode.react';
 import { 
   Camera, 
-  QrCode, 
+  QrCode as QrCodeIcon, 
   Search, 
   ArrowLeft,
   CheckCircle,
@@ -16,58 +18,111 @@ const QRScanner = () => {
   const navigate = useNavigate();
   const { produceItems } = useBlockchain();
   const [scanning, setScanning] = useState(false);
-  const [scannedData, setScannedData] = useState(null);
   const [scannedItem, setScannedItem] = useState(null);
   const [error, setError] = useState(null);
   const [manualInput, setManualInput] = useState('');
   const videoRef = useRef(null);
-  const streamRef = useRef(null);
+  const qrScannerRef = useRef(null);
 
   const startScanning = async () => {
     try {
       setError(null);
       setScanning(true);
       
+      // Check if camera is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera not supported on this device');
+      }
+
+      // Request camera permissions first
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } 
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        } 
       });
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        streamRef.current = stream;
+        
+        qrScannerRef.current = new QrScanner(
+          videoRef.current,
+          (result) => {
+            console.log('QR Code detected:', result.data);
+            handleQRCodeScanned(result.data);
+          },
+          {
+            onDecodeError: (error) => {
+              // Ignore decode errors, they're common during scanning
+              console.log('Decode error (normal during scanning):', error);
+            },
+            highlightScanRegion: true,
+            highlightCodeOutline: true,
+            preferredCamera: 'environment',
+            maxScansPerSecond: 5,
+          }
+        );
+        
+        await qrScannerRef.current.start();
+        console.log('QR Scanner started successfully');
       }
       
-      // Simulate QR code detection (in a real app, you'd use a QR library)
-      setTimeout(() => {
-        // Mock QR code data for demonstration
-        const mockQRData = 'https://example.com/qr/1';
-        handleQRCodeScanned(mockQRData);
-      }, 3000);
-      
     } catch (err) {
-      setError('Camera access denied. Please allow camera permissions.');
+      console.error('Error starting QR scanner:', err);
+      let errorMessage = 'Camera access denied. ';
+      
+      if (err.name === 'NotAllowedError') {
+        errorMessage += 'Please allow camera permissions in your browser settings and refresh the page.';
+      } else if (err.name === 'NotFoundError') {
+        errorMessage += 'No camera found on this device.';
+      } else if (err.name === 'NotSupportedError') {
+        errorMessage += 'Camera not supported on this device.';
+      } else {
+        errorMessage += 'Please try again or use manual search instead.';
+      }
+      
+      setError(errorMessage);
       setScanning(false);
     }
   };
 
   const stopScanning = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
+    if (qrScannerRef.current) {
+      qrScannerRef.current.stop();
+      qrScannerRef.current.destroy();
+      qrScannerRef.current = null;
     }
     setScanning(false);
   };
 
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      if (qrScannerRef.current) {
+        qrScannerRef.current.destroy();
+      }
+    };
+  }, []);
+
   const handleQRCodeScanned = (data) => {
-    setScannedData(data);
+    console.log('Processing QR code data:', data);
     stopScanning();
     
     // Find the produce item based on QR code data
-    const item = produceItems.find(item => item.qrCode === data);
+    const item = produceItems.find(item => 
+      item.qrCode === data || 
+      item.id === data || 
+      item.blockchainHash.includes(data)
+    );
+    
     if (item) {
+      console.log('Found matching item:', item);
       setScannedItem(item);
+      setError(null);
     } else {
-      setError('QR code not recognized. Please try a different code.');
+      console.log('No matching item found for QR data:', data);
+      setError(`QR code not recognized: "${data}". Please try a different code or use manual search.`);
     }
   };
 
@@ -83,7 +138,6 @@ const QRScanner = () => {
       
       if (item) {
         setScannedItem(item);
-        setScannedData(manualInput);
         setError(null);
       } else {
         setError('No produce item found with the provided information.');
@@ -92,7 +146,6 @@ const QRScanner = () => {
   };
 
   const resetScanner = () => {
-    setScannedData(null);
     setScannedItem(null);
     setError(null);
     setManualInput('');
@@ -250,7 +303,7 @@ const QRScanner = () => {
       {/* Header */}
       <div className="text-center mb-8">
         <div className="bg-primary-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-          <QrCode className="h-10 w-10 text-primary-600" />
+          <QrCodeIcon className="h-10 w-10 text-primary-600" />
         </div>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">QR Code Scanner</h1>
         <p className="text-gray-600">
@@ -270,6 +323,9 @@ const QRScanner = () => {
                 <p className="text-gray-600 mb-4">
                   Click the button below to start scanning QR codes
                 </p>
+                <p className="text-sm text-gray-500 mb-6">
+                  Make sure to allow camera permissions when prompted
+                </p>
                 <button
                   onClick={startScanning}
                   className="btn-primary flex items-center mx-auto"
@@ -277,19 +333,20 @@ const QRScanner = () => {
                   <Camera className="h-5 w-5 mr-2" />
                   Start Scanning
                 </button>
+                <div className="mt-4 text-xs text-gray-400">
+                  💡 If camera doesn't work, use the test buttons or manual search below
+                </div>
               </div>
             ) : (
               <div className="space-y-4">
                 <div className="relative bg-black rounded-lg overflow-hidden">
                   <video
                     ref={videoRef}
-                    autoPlay
-                    playsInline
                     className="w-full h-64 object-cover"
                   />
-                  <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="border-2 border-white border-dashed w-48 h-48 rounded-lg flex items-center justify-center">
-                      <QrCode className="h-12 w-12 text-white opacity-50" />
+                      <QrCodeIcon className="h-12 w-12 text-white opacity-50" />
                     </div>
                   </div>
                 </div>
@@ -306,7 +363,22 @@ const QRScanner = () => {
               <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
                 <div className="flex items-center">
                   <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
-                  <span className="text-red-700">{error}</span>
+                  <div>
+                    <span className="text-red-700 font-medium">Error:</span>
+                    <p className="text-red-700 text-sm mt-1">{error}</p>
+                    <p className="text-red-600 text-xs mt-2">
+                      💡 Try using the "Test Scan" buttons above or manual search instead.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {scanning && (
+              <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                  <span className="text-blue-700">Scanning for QR codes... Point camera at a QR code</span>
                 </div>
               </div>
             )}
@@ -341,6 +413,46 @@ const QRScanner = () => {
             </form>
           </div>
 
+          {/* Test QR Codes */}
+          <div className="card bg-green-50 border border-green-200">
+            <h3 className="text-lg font-semibold text-green-900 mb-3">Test QR Codes</h3>
+            <p className="text-sm text-green-800 mb-4">
+              Use these test QR codes to try the scanner:
+            </p>
+            <div className="space-y-3">
+              {produceItems.slice(0, 3).map((item) => (
+                <div key={item.id} className="flex items-center justify-between bg-white p-3 rounded border">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center">
+                      <QRCode value={item.qrCode} size={40} />
+                    </div>
+                    <div>
+                      <div className="font-medium text-sm">{item.name}</div>
+                      <div className="text-xs text-gray-500">ID: {item.id}</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleQRCodeScanned(item.qrCode)}
+                    className="text-green-600 hover:text-green-800 text-sm font-medium px-3 py-1 border border-green-300 rounded hover:bg-green-50"
+                  >
+                    Test Scan
+                  </button>
+                </div>
+              ))}
+            </div>
+            
+            {/* Large QR Code for Real Scanning */}
+            <div className="mt-6 p-4 bg-white rounded border text-center">
+              <h4 className="text-sm font-medium text-gray-900 mb-2">Scan This QR Code with Camera</h4>
+              <div className="flex justify-center">
+                <QRCode value={produceItems[0]?.qrCode || 'https://example.com/qr/1'} size={150} />
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Point your camera at this QR code to test real scanning
+              </p>
+            </div>
+          </div>
+
           {/* Instructions */}
           <div className="card bg-blue-50 border border-blue-200">
             <h3 className="text-lg font-semibold text-blue-900 mb-3">How to Use</h3>
@@ -355,7 +467,7 @@ const QRScanner = () => {
               </div>
               <div className="flex items-start">
                 <div className="w-2 h-2 bg-blue-600 rounded-full mr-2 mt-2 flex-shrink-0"></div>
-                <span>Instantly access blockchain-verified information</span>
+                <span>Use the test buttons above to try the scanner</span>
               </div>
             </div>
           </div>
