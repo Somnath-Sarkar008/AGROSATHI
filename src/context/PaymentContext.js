@@ -3,18 +3,13 @@ import { useBlockchain } from './BlockchainContext';
 
 const PaymentContext = createContext();
 
-export const usePayment = () => {
-  const context = useContext(PaymentContext);
-  if (!context) {
-    throw new Error('usePayment must be used within a PaymentProvider');
-  }
-  return context;
-};
+export const usePayment = () => useContext(PaymentContext);
 
 export const PaymentProvider = ({ children }) => {
-  const { addProduceItem, updateProduceStatus } = useBlockchain();
+  const { addProduceItem, updateProduceStatus, account, contract, rebateGasFees } = useBlockchain();
   const [isLoading, setIsLoading] = useState(false);
   const [paymentHistory, setPaymentHistory] = useState([]);
+  const [razorpayKey, setRazorpayKey] = useState(process.env.REACT_APP_RAZORPAY_KEY_ID || 'rzp_test_YOUR_TEST_KEY');
 
   // Initialize Razorpay
   useEffect(() => {
@@ -23,10 +18,27 @@ export const PaymentProvider = ({ children }) => {
     script.async = true;
     document.body.appendChild(script);
 
+    // Load payment history from localStorage
+    const savedHistory = localStorage.getItem('paymentHistory');
+    if (savedHistory) {
+      try {
+        setPaymentHistory(JSON.parse(savedHistory));
+      } catch (error) {
+        console.error('Error parsing payment history:', error);
+      }
+    }
+
     return () => {
-      document.body.removeChild(script);
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
     };
   }, []);
+
+  // Save payment history to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('paymentHistory', JSON.stringify(paymentHistory));
+  }, [paymentHistory]);
 
   // Create payment order
   const createPaymentOrder = async (produceData, amount) => {
@@ -43,7 +55,9 @@ export const PaymentProvider = ({ children }) => {
         notes: {
           produceName: produceData.name,
           farmerName: produceData.farmer,
-          location: produceData.location
+          location: produceData.location,
+          buyerAddress: account || '',
+          blockchainHash: produceData.blockchainHash || ''
         }
       };
     } catch (error) {
@@ -62,23 +76,32 @@ export const PaymentProvider = ({ children }) => {
       
       // Configure Razorpay options
       const options = {
-        key: process.env.REACT_APP_RAZORPAY_KEY_ID || 'rzp_test_YOUR_TEST_KEY', // Replace with your actual key
+        key: razorpayKey,
         amount: order.amount,
         currency: order.currency,
-        name: 'AgriBlock',
+        name: 'AgriChain',
         description: `Registration for ${produceData.name}`,
         order_id: order.id,
         handler: async (response) => {
           // Payment successful - add to blockchain
           await handlePaymentSuccess(response, produceData, order);
+          
+          // If blockchain contract is available, rebate gas fees
+          if (contract && account) {
+            try {
+              await rebateGasFees(produceData.id, account);
+            } catch (error) {
+              console.error('Error rebating gas fees:', error);
+            }
+          }
         },
         prefill: {
           name: produceData.farmer,
-          email: 'farmer@agriblock.in', // You can add email field to form
-          contact: '+91XXXXXXXXXX' // You can add phone field to form
+          email: 'farmer@agrichain.in',
+          contact: '+91XXXXXXXXXX'
         },
         theme: {
-          color: '#16a34a' // Primary green color
+          color: '#4F46E5' // Indigo color to match UI
         },
         modal: {
           ondismiss: () => {
@@ -110,7 +133,8 @@ export const PaymentProvider = ({ children }) => {
         status: 'completed',
         timestamp: new Date().toISOString(),
         produceData: produceData,
-        blockchainHash: null // Will be set after blockchain transaction
+        blockchainHash: null, // Will be set after blockchain transaction
+        buyerAddress: account
       };
 
       // Add produce to blockchain
@@ -153,6 +177,16 @@ export const PaymentProvider = ({ children }) => {
   const getPaymentHistory = () => {
     return paymentHistory;
   };
+  
+  // Get payment history for a specific item
+  const getItemPaymentHistory = (itemId) => {
+    return paymentHistory.filter(payment => payment.produceData.id === itemId);
+  };
+
+  // Get payment history for the current user (buyer)
+  const getUserPaymentHistory = () => {
+    return paymentHistory.filter(payment => payment.buyerAddress === account);
+  };
 
   // Verify payment (in real app, this would verify with Razorpay webhook)
   const verifyPayment = async (paymentId, orderId, signature) => {
@@ -182,6 +216,8 @@ export const PaymentProvider = ({ children }) => {
     isLoading,
     processPayment,
     getPaymentHistory,
+    getItemPaymentHistory,
+    getUserPaymentHistory,
     verifyPayment,
     calculateTotalAmount,
     paymentHistory

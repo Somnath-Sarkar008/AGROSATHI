@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { useBlockchain } from '../context/BlockchainContext';
+import { usePayment } from '../context/PaymentContext';
 import { 
   Search, 
   MapPin, 
@@ -14,16 +15,20 @@ import {
   Truck,
   Home,
   Factory,
-  Store
+  Store,
+  CreditCard,
+  ShoppingCart
 } from 'lucide-react';
 import QRCode from 'qrcode.react';
 
 const ProduceTracking = () => {
   const [searchParams] = useSearchParams();
   const { produceItems } = useBlockchain();
+  const { getItemPaymentHistory } = usePayment();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
   const [filteredItems, setFilteredItems] = useState([]);
+  const [paymentHistory, setPaymentHistory] = useState([]);
 
   // Check if there's a specific item ID in the URL
   useEffect(() => {
@@ -33,9 +38,13 @@ const ProduceTracking = () => {
       if (item) {
         setSelectedItem(item);
         setSearchTerm(item.name);
+        
+        // Get payment history for this item
+        const payments = getItemPaymentHistory(itemId);
+        setPaymentHistory(payments);
       }
     }
-  }, [searchParams, produceItems]);
+  }, [searchParams, produceItems, getItemPaymentHistory]);
 
   // Filter items based on search term
   useEffect(() => {
@@ -57,6 +66,8 @@ const ProduceTracking = () => {
       case 'Packaged': return <Package className="h-5 w-5 text-yellow-600" />;
       case 'In Transit': return <Truck className="h-5 w-5 text-blue-600" />;
       case 'Delivered': return <CheckCircle className="h-5 w-5 text-gray-600" />;
+      case 'Paid and Registered': return <CreditCard className="h-5 w-5 text-purple-600" />;
+      case 'Sold': return <ShoppingCart className="h-5 w-5 text-indigo-600" />;
       default: return <Clock className="h-5 w-5 text-gray-600" />;
     }
   };
@@ -67,6 +78,8 @@ const ProduceTracking = () => {
       case 'Packaged': return 'bg-yellow-100 text-yellow-800';
       case 'In Transit': return 'bg-blue-100 text-blue-800';
       case 'Delivered': return 'bg-gray-100 text-gray-800';
+      case 'Paid and Registered': return 'bg-purple-100 text-purple-800';
+      case 'Sold': return 'bg-indigo-100 text-indigo-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -91,6 +104,10 @@ const ProduceTracking = () => {
 
   const handleItemSelect = (item) => {
     setSelectedItem(item);
+    
+    // Get payment history for this item
+    const payments = getItemPaymentHistory(item.id);
+    setPaymentHistory(payments);
   };
 
   const handleSearch = (e) => {
@@ -291,6 +308,40 @@ const ProduceTracking = () => {
                     </div>
                   ))}
                 </div>
+              </div>
+              
+              {/* Payment History */}
+              <div className="card">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment History</h3>
+                {paymentHistory && paymentHistory.length > 0 ? (
+                  <div className="space-y-4">
+                    {paymentHistory.map((payment, index) => (
+                      <div key={index} className="flex items-start space-x-4">
+                        <div className="flex-shrink-0">
+                          <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                            <DollarSign className="h-4 w-4 text-purple-600" />
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <span className="text-sm font-medium text-gray-900">{payment.type}</span>
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${payment.status === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                              {payment.status}
+                            </span>
+                          </div>
+                          <div className="text-sm font-medium text-gray-900">${payment.amount}</div>
+                          <div className="text-sm text-gray-600">Transaction ID: {payment.transactionId}</div>
+                          <div className="text-xs text-gray-500">{formatDate(payment.timestamp)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-500">No payment records found</p>
+                  </div>
+                )}
               </div>
             </div>
           ) : (

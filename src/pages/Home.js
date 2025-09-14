@@ -26,13 +26,13 @@ const Home = () => {
     },
     {
       icon: Users,
-      title: 'Stakeholder Verification',
-      description: 'Farmers, distributors, and retailers can verify transactions and maintain trust throughout the supply chain.'
+      title: 'Secure Payments',
+      description: 'Integrated RazorPay payment system with blockchain verification ensures secure and transparent transactions.'
     },
     {
       icon: Globe,
       title: 'Global Access',
-      description: 'Access produce information from anywhere in the world with our decentralized platform.'
+      description: 'Access produce information and payment history from anywhere in the world with our decentralized platform.'
     }
   ];
 

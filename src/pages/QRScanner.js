@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBlockchain } from '../context/BlockchainContext';
+import { usePayment } from '../context/PaymentContext';
+import { ethers } from 'ethers';
 import QrScanner from 'qr-scanner';
 import QRCode from 'qrcode.react';
 import { 
@@ -11,12 +13,14 @@ import {
   CheckCircle,
   AlertCircle,
   Download,
-  Share2
+  Share2,
+  ShoppingCart
 } from 'lucide-react';
 
 const QRScanner = () => {
   const navigate = useNavigate();
-  const { produceItems } = useBlockchain();
+  const { produceItems, contract, account } = useBlockchain();
+  const { processPayment } = usePayment();
   const [scanning, setScanning] = useState(false);
   const [scannedItem, setScannedItem] = useState(null);
   const [error, setError] = useState(null);
@@ -105,28 +109,73 @@ const QRScanner = () => {
     };
   }, []);
 
-  const handleQRCodeScanned = (data) => {
+  const handleQRCodeScanned = async (data) => {
     console.log('Processing QR code data:', data);
     stopScanning();
     
-    // Find the produce item based on QR code data
-    const item = produceItems.find(item => 
-      item.qrCode === data || 
-      item.id === data || 
-      item.blockchainHash.includes(data)
-    );
-    
-    if (item) {
-      console.log('Found matching item:', item);
-      setScannedItem(item);
-      setError(null);
-    } else {
-      console.log('No matching item found for QR data:', data);
-      setError(`QR code not recognized: "${data}". Please try a different code or use manual search.`);
+    try {
+      // Try to parse as JSON first
+      const itemData = JSON.parse(data);
+      console.log('Parsed QR data:', itemData);
+      
+      // Find the item in our system
+      const foundItem = produceItems.find(item => item.id === itemData.id);
+      
+      if (foundItem) {
+        // Verify blockchain data if available
+        if (contract && foundItem.blockchainHash) {
+          try {
+            // Verify the item on blockchain
+            const onChainData = await contract.getItemDetails(foundItem.id);
+            const verified = onChainData && onChainData.blockchainHash === foundItem.blockchainHash;
+            
+            setScannedItem({
+              ...foundItem,
+              verified: verified,
+              onChainOwner: onChainData ? onChainData.owner : null,
+              onChainStatus: onChainData ? onChainData.status : null
+            });
+            
+            if (!verified) {
+              setError('Warning: Item data does not match blockchain record');
+            } else {
+              setError(null);
+            }
+          } catch (error) {
+            console.error('Error verifying on blockchain:', error);
+            setScannedItem(foundItem);
+            setError('Could not verify on blockchain');
+          }
+        } else {
+          setScannedItem(foundItem);
+          setError(null);
+        }
+      } else {
+        setError('Item not found in our system');
+      }
+    } catch (error) {
+      // If JSON parsing fails, try the original approach
+      console.log('Not JSON data, trying direct matching');
+      
+      // Find the produce item based on QR code data
+      const item = produceItems.find(item => 
+        item.qrCode === data || 
+        item.id === data || 
+        item.blockchainHash.includes(data)
+      );
+      
+      if (item) {
+        console.log('Found matching item:', item);
+        setScannedItem(item);
+        setError(null);
+      } else {
+        console.log('No matching item found for QR data:', data);
+        setError(`QR code not recognized: "${data}". Please try a different code or use manual search.`);
+      }
     }
   };
 
-  const handleManualSearch = (e) => {
+  const handleManualSearch = async (e) => {
     e.preventDefault();
     if (manualInput.trim()) {
       // Search for produce by name, ID, or blockchain hash
@@ -153,13 +202,64 @@ const QRScanner = () => {
   };
 
   const downloadQRCode = () => {
+    // Generate QR code data with blockchain information
+    const qrData = scannedItem ? JSON.stringify({
+      id: scannedItem.id,
+      name: scannedItem.name,
+      blockchainHash: scannedItem.blockchainHash,
+      timestamp: new Date().toISOString()
+    }) : null;
     if (scannedItem) {
       // In a real app, you'd generate and download the QR code
       alert('QR code download feature would be implemented here');
     }
   };
 
+  const handleBuyItem = async (item) => {
+    try {
+      // Process payment first
+      await processPayment(item, item.price);
+      
+      // If payment successful and contract is available, buy the item on blockchain
+      if (contract && account) {
+        try {
+          await contract.buyItem(item.id, { value: ethers.utils.parseEther(item.price) });
+          alert('Item purchased successfully!');
+          setScannedItem(prev => ({
+            ...prev,
+            status: 'Sold',
+            owner: account
+          }));
+        } catch (error) {
+          console.error('Error buying item on blockchain:', error);
+          alert('Payment processed but blockchain transaction failed. Please contact support.');
+        }
+      } else {
+        alert('Item purchased successfully!');
+        setScannedItem(prev => ({
+          ...prev,
+          status: 'Sold'
+        }));
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      alert('Payment failed. Please try again.');
+    }
+  };
+
   const shareProduceInfo = () => {
+    // Create a data object with all necessary information
+    const qrData = scannedItem ? JSON.stringify({
+      id: scannedItem.id,
+      name: scannedItem.name,
+      farmer: scannedItem.farmer,
+      location: scannedItem.location,
+      price: scannedItem.price,
+      status: scannedItem.status,
+      blockchainHash: scannedItem.blockchainHash,
+      timestamp: new Date().toISOString(),
+      verified: true
+    }) : null;
     if (scannedItem && navigator.share) {
       navigator.share({
         title: `Track ${scannedItem.name}`,
@@ -286,12 +386,18 @@ const QRScanner = () => {
               Download QR Code
             </button>
             <button
-              onClick={shareProduceInfo}
-              className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center"
-            >
-              <Share2 className="h-4 w-4 mr-2" />
-              Share
-            </button>
+                onClick={shareProduceInfo}
+                className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center"
+              >
+                <Share2 className="h-4 w-4 mr-2" />
+                Share
+              </button>
+              <button
+                onClick={() => handleBuyItem(scannedItem)}
+                className="ml-4 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center"
+              >
+                Buy Now
+              </button>
           </div>
         </div>
       </div>

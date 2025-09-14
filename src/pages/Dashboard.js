@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useBlockchain } from '../context/BlockchainContext';
+import { usePayment } from '../context/PaymentContext';
 import { 
   Plus, 
   Search, 
@@ -11,11 +12,13 @@ import {
   Users, 
   DollarSign,
   MapPin,
-  Leaf
+  Leaf,
+  CreditCard
 } from 'lucide-react';
 
 const Dashboard = () => {
   const { produceItems, isConnected } = useBlockchain();
+  const { paymentHistory } = usePayment();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
@@ -70,6 +73,13 @@ const Dashboard = () => {
       icon: DollarSign,
       color: 'text-orange-600',
       bgColor: 'bg-orange-50'
+    },
+    {
+      label: 'Payments Processed',
+      value: paymentHistory.length,
+      icon: CreditCard,
+      color: 'text-indigo-600',
+      bgColor: 'bg-indigo-50'
     }
   ];
 
@@ -79,6 +89,8 @@ const Dashboard = () => {
       case 'In Transit': return 'bg-blue-100 text-blue-800';
       case 'Delivered': return 'bg-gray-100 text-gray-800';
       case 'Packaged': return 'bg-yellow-100 text-yellow-800';
+      case 'Paid and Registered': return 'bg-purple-100 text-purple-800';
+      case 'Sold': return 'bg-indigo-100 text-indigo-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -100,7 +112,7 @@ const Dashboard = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-6">
         {stats.map((stat, index) => (
           <div key={index} className="card">
             <div className="flex items-center justify-between">
@@ -142,6 +154,8 @@ const Dashboard = () => {
               <option value="Packaged">Packaged</option>
               <option value="In Transit">In Transit</option>
               <option value="Delivered">Delivered</option>
+              <option value="Paid and Registered">Paid and Registered</option>
+              <option value="Sold">Sold</option>
             </select>
           </div>
         </div>
@@ -230,7 +244,14 @@ const Dashboard = () => {
                           className="text-primary-600 hover:text-primary-900 flex items-center"
                         >
                           <Eye className="h-4 w-4 mr-1" />
-                          View
+                          Track
+                        </Link>
+                        <Link
+                          to={`/item/${item.id}`}
+                          className="text-indigo-600 hover:text-indigo-900 flex items-center"
+                        >
+                          <DollarSign className="h-4 w-4 mr-1" />
+                          Details
                         </Link>
                         <button className="text-secondary-600 hover:text-secondary-900 flex items-center">
                           <Edit className="h-4 w-4 mr-1" />
@@ -247,7 +268,7 @@ const Dashboard = () => {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid md:grid-cols-3 gap-6">
+      <div className="grid md:grid-cols-4 gap-6">
         <div className="card text-center hover:shadow-lg transition-shadow duration-200">
           <div className="bg-primary-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
             <Plus className="h-8 w-8 text-primary-600" />
@@ -278,6 +299,17 @@ const Dashboard = () => {
           <p className="text-gray-600 mb-4">Scan QR codes to access produce information</p>
           <Link to="/scan" className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 w-full">
             Scan QR
+          </Link>
+        </div>
+
+        <div className="card text-center hover:shadow-lg transition-shadow duration-200">
+          <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+            <DollarSign className="h-8 w-8 text-purple-600" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Payment History</h3>
+          <p className="text-gray-600 mb-4">View your payment transactions and history</p>
+          <Link to="/payments" className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 w-full">
+            View Payments
           </Link>
         </div>
       </div>

@@ -14,6 +14,7 @@ const Navbar = () => {
     { name: 'Track Produce', href: '/track' },
     { name: 'Add Produce', href: '/add-produce' },
     { name: 'Scan QR', href: '/scan' },
+    { name: 'Payments', href: '/payments' },
   ];
 
   const isActive = (path) => location.pathname === path;

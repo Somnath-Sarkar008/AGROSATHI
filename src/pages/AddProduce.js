@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBlockchain } from '../context/BlockchainContext';
 import { 
@@ -8,14 +8,16 @@ import {
   DollarSign, 
   Package,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Image
 } from 'lucide-react';
 
 const AddProduce = () => {
   const navigate = useNavigate();
-  const { addProduceItem, isConnected } = useBlockchain();
+  const { addProduceItem, isConnected, uploadToIPFS } = useBlockchain();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     farmer: '',
@@ -25,8 +27,12 @@ const AddProduce = () => {
     quality: 'Standard',
     description: '',
     quantity: '',
-    unit: 'kg'
+    unit: 'kg',
+    image: null
   });
+  
+  const [imagePreview, setImagePreview] = useState(null);
+  const fileInputRef = useRef(null);
 
   if (!isConnected) {
     return (
@@ -51,20 +57,46 @@ const AddProduce = () => {
       [name]: value
     }));
   };
+  
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFormData(prev => ({
+        ...prev,
+        image: file
+      }));
+      
+      // Create a preview URL
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+  
+  const triggerFileInput = () => {
+    fileInputRef.current.click();
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setError(null);
 
     try {
-      await addProduceItem(formData);
-      setShowSuccess(true);
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 2000);
+      const result = await addProduceItem(formData);
+      if (result && result.success) {
+        setShowSuccess(true);
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 2000);
+      } else {
+        setError('Failed to add produce item. Please try again.');
+      }
     } catch (error) {
       console.error('Error adding produce item:', error);
-      alert('Failed to add produce item. Please try again.');
+      setError(error.message || 'Failed to add produce item. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -99,6 +131,23 @@ const AddProduce = () => {
       </div>
     );
   }
+  
+  // Error message display
+  const ErrorMessage = () => {
+    if (!error) return null;
+    
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+        <div className="flex items-start">
+          <AlertCircle className="h-5 w-5 text-red-500 mr-2 mt-0.5" />
+          <div>
+            <h3 className="text-sm font-medium text-red-800">Error</h3>
+            <p className="text-sm text-red-700 mt-1">{error}</p>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -115,7 +164,42 @@ const AddProduce = () => {
 
       {/* Form */}
       <div className="card">
+        <ErrorMessage />
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Image Upload Section */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Product Image
+            </label>
+            <div 
+              className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:bg-gray-50 transition-colors"
+              onClick={triggerFileInput}
+            >
+              {imagePreview ? (
+                <div className="flex flex-col items-center">
+                  <img 
+                    src={imagePreview} 
+                    alt="Product preview" 
+                    className="w-48 h-48 object-cover rounded-lg mb-3" 
+                  />
+                  <span className="text-sm text-gray-500">Click to change image</span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center">
+                  <Image className="h-12 w-12 text-gray-400 mb-2" />
+                  <span className="text-sm font-medium text-gray-900">Click to upload product image</span>
+                  <span className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 5MB</span>
+                </div>
+              )}
+              <input 
+                type="file" 
+                ref={fileInputRef}
+                className="hidden" 
+                accept="image/*"
+                onChange={handleImageChange}
+              />
+            </div>
+          </div>
           {/* Basic Information */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
