@@ -307,4 +307,4 @@ export const AgriTrackerABI = [
 ];
 
 // Contract address - this would be the deployed contract address
-export const AgriTrackerAddress = "0x0000000000000000000000000000000000000000";
+export const AgriTrackerAddress = "0xD4Fc541236927E2EAf8F27606bD7309C1Fc2cbee";
