@@ -47,46 +47,49 @@ export const BlockchainProvider = ({ children }) => {
     }
   }, []);
 
-  // Mock data for demonstration
-  const mockProduceItems = [
-    {
-      id: '1',
-      name: 'Organic Tomatoes',
-      farmer: 'John Smith',
-      location: 'California, USA',
-      harvestDate: '2024-01-15',
-      price: '2.50',
-      quality: 'Premium',
-      status: 'Harvested',
-      blockchainHash: '0x1234...5678',
-      qrCode: 'https://example.com/qr/1',
-      history: [
-        { action: 'Harvested', timestamp: '2024-01-15T10:00:00Z', location: 'Farm' },
-        { action: 'Packaged', timestamp: '2024-01-16T14:00:00Z', location: 'Packaging Facility' },
-        { action: 'Shipped', timestamp: '2024-01-17T09:00:00Z', location: 'Distribution Center' }
-      ]
-    },
-    {
-      id: '2',
-      name: 'Fresh Lettuce',
-      farmer: 'Maria Garcia',
-      location: 'Texas, USA',
-      harvestDate: '2024-01-14',
-      price: '1.80',
-      quality: 'Standard',
-      status: 'In Transit',
-      blockchainHash: '0x8765...4321',
-      qrCode: 'https://example.com/qr/2',
-      history: [
-        { action: 'Harvested', timestamp: '2024-01-14T08:00:00Z', location: 'Farm' },
-        { action: 'Packaged', timestamp: '2024-01-15T12:00:00Z', location: 'Packaging Facility' }
-      ]
+  // Load items from blockchain
+  const fetchAllItemsFromChain = async () => {
+    try {
+      if (!contract) return [];
+      const ids = await contract.getAllItems();
+      const items = await Promise.all(ids.map(async (idBn) => {
+        const id = idBn.toString();
+        const details = await contract.getItemDetails(id);
+        // details matches struct in ABI
+        const item = {
+          id: details.id.toString(),
+          name: details.name,
+          location: details.location,
+          price: ethers.utils.formatEther(details.price),
+          quantity: details.quantity.toString(),
+          unit: details.unit,
+          status: details.status,
+          owner: details.owner,
+          imageUrl: details.imageUrl,
+          priceHash: details.priceHash,
+          timestamp: details.timestamp ? details.timestamp.toString() : undefined,
+          isActive: typeof details.isActive === 'boolean' ? details.isActive : undefined,
+          // Derived fields to keep UI stable
+          farmer: '',
+          quality: '',
+          harvestDate: details.timestamp ? new Date(Number(details.timestamp) * 1000).toISOString() : new Date().toISOString(),
+          blockchainHash: '',
+          qrCode: JSON.stringify({ id: id, name: details.name, contract: AgriTrackerAddress })
+        };
+        return item;
+      }));
+      setProduceItems(items);
+      return items;
+    } catch (err) {
+      console.error('Failed to fetch items from chain:', err);
     }
-  ];
+  };
 
   useEffect(() => {
-    setProduceItems(mockProduceItems);
-  }, []); // Remove mockProduceItems dependency to prevent infinite re-renders
+    if (contract) {
+      fetchAllItemsFromChain();
+    }
+  }, [contract]);
 
   const connectWallet = async () => {
     try {
@@ -171,6 +174,8 @@ export const BlockchainProvider = ({ children }) => {
         owner,
         timestamp: new Date().toISOString()
       }]);
+      // Refresh items on upload
+      fetchAllItemsFromChain();
     });
     
     // Listen for ItemHistoryUpdated events
@@ -182,6 +187,7 @@ export const BlockchainProvider = ({ children }) => {
         status,
         timestamp: new Date().toISOString()
       }]);
+      fetchAllItemsFromChain();
     });
     
     // Listen for OwnershipTransferred events
@@ -194,6 +200,7 @@ export const BlockchainProvider = ({ children }) => {
         to,
         timestamp: new Date().toISOString()
       }]);
+      fetchAllItemsFromChain();
     });
     
     // Listen for ItemBought events
@@ -206,6 +213,7 @@ export const BlockchainProvider = ({ children }) => {
         price: price.toString(),
         timestamp: new Date().toISOString()
       }]);
+      fetchAllItemsFromChain();
     });
     
     // Listen for GasFeeRebated events
@@ -285,11 +293,11 @@ export const BlockchainProvider = ({ children }) => {
         imageUrl = 'https://via.placeholder.com/300?text=Upload+Failed';
       }
       
-      // Store hashed price on IPFS
-      const itemId = Date.now().toString();
+      // Store hashed price on IPFS (use a temp id for IPFS hash payload only)
+      const tempIdForHash = Date.now().toString();
       let priceHash;
       try {
-        priceHash = await storeHashedPrice(produceData.price, itemId);
+        priceHash = await storeHashedPrice(produceData.price, tempIdForHash);
       } catch (priceHashError) {
         console.error('Price hash error:', priceHashError);
         priceHash = `mock-price-hash-${Date.now()}`;
@@ -298,6 +306,7 @@ export const BlockchainProvider = ({ children }) => {
       // Interact with smart contract if connected
       let blockchainHash = '';
       let blockchainSuccess = false;
+      let newItemId = null;
       
       if (contract && window.ethereum) {
         try {
@@ -350,7 +359,7 @@ export const BlockchainProvider = ({ children }) => {
           // Get the item ID from the event
           const event = receipt.events.find(e => e.event === 'ItemUploaded');
           if (event) {
-            const newItemId = event.args.itemId.toString();
+            newItemId = event.args.itemId.toString();
             console.log('New item ID from blockchain:', newItemId);
           }
         } catch (error) {
@@ -361,33 +370,13 @@ export const BlockchainProvider = ({ children }) => {
         console.warn('Contract or Ethereum provider not available, using mock data');
       }
       
-      // Create item object (either from blockchain or mock)
-      const newItem = {
-        id: itemId,
-        ...produceData,
-        status: blockchainSuccess ? 'Registered on Blockchain' : 'Harvested', // Add default status
-        blockchainHash: blockchainHash || `0x${Math.random().toString(16).substr(2, 8)}...`,
-        qrCode: `https://example.com/qr/${Date.now()}`,
-        imageUrl: imageUrl,
-        priceHash: priceHash,
-        history: [
-          {
-            action: blockchainSuccess ? 'Added to Blockchain' : 'Created (Pending Blockchain)',
-            timestamp: new Date().toISOString(),
-            location: produceData.location
-          }
-        ]
-      };
+      if (blockchainSuccess && newItemId) {
+        // Fetch the canonical item from chain
+        await fetchAllItemsFromChain();
+        return { success: true, itemId: newItemId, blockchainHash };
+      }
       
-      console.log('New item created:', newItem);
-      
-      setProduceItems(prev => {
-        const updated = [...prev, newItem];
-        console.log('Updated produce items:', updated);
-        return updated;
-      });
-      
-      return { success: true, item: newItem };
+      throw new Error('Blockchain transaction failed');
       
       return newItem;
     } catch (error) {
@@ -527,9 +516,16 @@ export const BlockchainProvider = ({ children }) => {
     }
   };
 
-  const getProduceHistory = (itemId) => {
-    const item = produceItems.find(item => item.id === itemId);
-    return item ? item.history : [];
+  const getProduceHistory = async (itemId) => {
+    try {
+      if (!contract) return [];
+      const history = await contract.getItemHistory(itemId);
+      // Contract returns array of status strings; map to shape used by UI
+      return history.map((status) => ({ action: status, timestamp: undefined }));
+    } catch (err) {
+      console.error('Failed to fetch item history:', err);
+      return [];
+    }
   };
 
   const value = {

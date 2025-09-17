@@ -123,11 +123,11 @@ const QRScanner = () => {
       
       if (foundItem) {
         // Verify blockchain data if available
-        if (contract && foundItem.blockchainHash) {
+        if (contract) {
           try {
             // Verify the item on blockchain
             const onChainData = await contract.getItemDetails(foundItem.id);
-            const verified = onChainData && onChainData.blockchainHash === foundItem.blockchainHash;
+            const verified = onChainData && onChainData.name === foundItem.name && onChainData.owner === foundItem.owner;
             
             setScannedItem({
               ...foundItem,

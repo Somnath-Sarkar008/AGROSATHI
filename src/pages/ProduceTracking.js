@@ -23,12 +23,13 @@ import QRCode from 'qrcode.react';
 
 const ProduceTracking = () => {
   const [searchParams] = useSearchParams();
-  const { produceItems } = useBlockchain();
+  const { produceItems, getProduceHistory } = useBlockchain();
   const { getItemPaymentHistory } = usePayment();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
   const [filteredItems, setFilteredItems] = useState([]);
   const [paymentHistory, setPaymentHistory] = useState([]);
+  const [itemHistory, setItemHistory] = useState([]);
 
   // Check if there's a specific item ID in the URL
   useEffect(() => {
@@ -42,6 +43,16 @@ const ProduceTracking = () => {
         // Get payment history for this item
         const payments = getItemPaymentHistory(itemId);
         setPaymentHistory(payments);
+
+        // Fetch on-chain history
+        (async () => {
+          try {
+            const history = await getProduceHistory(itemId);
+            setItemHistory(Array.isArray(history) ? history : []);
+          } catch (e) {
+            setItemHistory([]);
+          }
+        })();
       }
     }
   }, [searchParams, produceItems, getItemPaymentHistory]);
@@ -108,6 +119,16 @@ const ProduceTracking = () => {
     // Get payment history for this item
     const payments = getItemPaymentHistory(item.id);
     setPaymentHistory(payments);
+
+    // Fetch on-chain history
+    (async () => {
+      try {
+        const history = await getProduceHistory(item.id);
+        setItemHistory(Array.isArray(history) ? history : []);
+      } catch (e) {
+        setItemHistory([]);
+      }
+    })();
   };
 
   const handleSearch = (e) => {
@@ -278,7 +299,7 @@ const ProduceTracking = () => {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">QR Code</h3>
                 <div className="text-center">
                   <div className="bg-white p-4 rounded-lg inline-block border">
-                    <QRCode value={selectedItem.qrCode} size={200} />
+                    <QRCode value={selectedItem.qrCode || JSON.stringify({ id: selectedItem.id })} size={200} />
                   </div>
                   <p className="text-sm text-gray-600 mt-2">
                     Scan this QR code to access produce information
@@ -290,7 +311,7 @@ const ProduceTracking = () => {
               <div className="card">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Supply Chain History</h3>
                 <div className="space-y-4">
-                  {selectedItem.history.map((event, index) => (
+                  {(itemHistory || []).map((event, index) => (
                     <div key={index} className="flex items-start space-x-4">
                       <div className="flex-shrink-0">
                         <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
@@ -302,8 +323,8 @@ const ProduceTracking = () => {
                           {getLocationIcon(event.action)}
                           <span className="text-sm font-medium text-gray-900">{event.action}</span>
                         </div>
-                        <div className="text-sm text-gray-600">{event.location}</div>
-                        <div className="text-xs text-gray-500">{formatDate(event.timestamp)}</div>
+                        {event.location && <div className="text-sm text-gray-600">{event.location}</div>}
+                        {event.timestamp && <div className="text-xs text-gray-500">{formatDate(event.timestamp)}</div>}
                       </div>
                     </div>
                   ))}
