@@ -22,6 +22,8 @@ export const BlockchainProvider = ({ children }) => {
   const [produceItems, setProduceItems] = useState([]);
   const [ipfs, setIpfs] = useState(null);
   const [events, setEvents] = useState([]);
+  const SEPOLIA_CHAIN_ID = 11155111;
+  const SEPOLIA_CHAIN_ID_HEX = '0xaa36a7';
   
   // Initialize IPFS client
   useEffect(() => {
@@ -93,7 +95,44 @@ export const BlockchainProvider = ({ children }) => {
           method: 'eth_requestAccounts'
         });
         
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        let provider = new ethers.providers.Web3Provider(window.ethereum);
+        let network = await provider.getNetwork();
+
+        // Ensure we are on Sepolia
+        if (network.chainId !== SEPOLIA_CHAIN_ID) {
+          try {
+            await window.ethereum.request({
+              method: 'wallet_switchEthereumChain',
+              params: [{ chainId: SEPOLIA_CHAIN_ID_HEX }]
+            });
+          } catch (switchError) {
+            // If the chain has not been added to MetaMask
+            if (switchError && switchError.code === 4902) {
+              try {
+                await window.ethereum.request({
+                  method: 'wallet_addEthereumChain',
+                  params: [{
+                    chainId: SEPOLIA_CHAIN_ID_HEX,
+                    chainName: 'Sepolia',
+                    nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
+                    rpcUrls: ['https://rpc.sepolia.org'],
+                    blockExplorerUrls: ['https://sepolia.etherscan.io']
+                  }]
+                });
+              } catch (addError) {
+                console.error('Failed to add Sepolia network:', addError);
+                throw addError;
+              }
+            } else {
+              console.error('Failed to switch to Sepolia:', switchError);
+              throw switchError;
+            }
+          }
+          // Recreate provider after switching
+          provider = new ethers.providers.Web3Provider(window.ethereum);
+          network = await provider.getNetwork();
+        }
+
         const signer = provider.getSigner();
         
         // Initialize contract
@@ -456,7 +495,7 @@ export const BlockchainProvider = ({ children }) => {
               {
                 action: 'Purchased',
                 timestamp: new Date().toISOString(),
-                details: `Purchased for ${price} ETH`
+                details: `Purchased for ${price} Sepolia ETH`
               }
             ]
           };

@@ -385,7 +385,7 @@ contract AgriTracker {
     /**
      * @dev Emergency function to pause contract (only owner)
      */
-    function emergencyPause() external onlyOwner {
+    function emergencyPause() external view onlyOwner {
         // This is a placeholder for emergency pause functionality
         // In a production contract, you would implement a pause mechanism
         require(false, "Emergency pause activated");

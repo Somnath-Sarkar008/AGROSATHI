@@ -109,9 +109,9 @@ The build artifacts will be stored in the `build/` directory.
 Create a `.env` file in the root directory:
 
 ```env
-REACT_APP_CHAIN_ID=1
-REACT_APP_RPC_URL=https://mainnet.infura.io/v3/YOUR_PROJECT_ID
-REACT_APP_CONTRACT_ADDRESS=YOUR_SMART_CONTRACT_ADDRESS
+REACT_APP_CHAIN_ID=11155111
+REACT_APP_RPC_URL=https://sepolia.infura.io/v3/YOUR_PROJECT_ID
+REACT_APP_CONTRACT_ADDRESS=YOUR_SEPOLIA_CONTRACT_ADDRESS
 ```
 
 ### Customization
