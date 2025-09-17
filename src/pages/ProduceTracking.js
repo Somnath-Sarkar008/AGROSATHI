@@ -299,7 +299,12 @@ const ProduceTracking = () => {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">QR Code</h3>
                 <div className="text-center">
                   <div className="bg-white p-4 rounded-lg inline-block border">
-                    <QRCode value={selectedItem.qrCode || JSON.stringify({ id: selectedItem.id })} size={200} />
+                    <QRCode value={selectedItem.qrCode || JSON.stringify({ id: selectedItem.id })} size={180} />
+                  </div>
+                  <div className="mt-3 mx-auto max-w-sm">
+                    <div className="text-xs text-gray-600 font-mono bg-gray-50 border rounded p-2 break-all">
+                      {selectedItem.qrCode || JSON.stringify({ id: selectedItem.id })}
+                    </div>
                   </div>
                   <p className="text-sm text-gray-600 mt-2">
                     Scan this QR code to access produce information

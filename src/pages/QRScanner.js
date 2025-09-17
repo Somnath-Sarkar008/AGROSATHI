@@ -363,7 +363,14 @@ const QRScanner = () => {
                 <div className="w-2 h-2 bg-primary-600 rounded-full mr-3"></div>
                 <div>
                   <div className="text-sm font-medium text-gray-900">QR Code</div>
-                  <div className="text-sm text-gray-600">{scannedItem.qrCode}</div>
+                  <div className="flex items-center gap-3 mt-1">
+                    <div className="bg-white p-2 rounded border">
+                      <QRCode value={scannedItem.qrCode || JSON.stringify({ id: scannedItem.id })} size={72} />
+                    </div>
+                    <div className="text-xs text-gray-600 font-mono bg-gray-50 border rounded p-2 max-w-[260px] break-all overflow-x-auto">
+                      {scannedItem.qrCode || JSON.stringify({ id: scannedItem.id })}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
