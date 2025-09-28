@@ -70,7 +70,7 @@ export const BlockchainProvider = ({ children }) => {
           timestamp: details.timestamp ? details.timestamp.toString() : undefined,
           isActive: typeof details.isActive === 'boolean' ? details.isActive : undefined,
           // Derived fields to keep UI stable
-          farmer: '',
+          farmer: details.owner || 'Unknown Farmer',
           quality: '',
           harvestDate: details.timestamp ? new Date(Number(details.timestamp) * 1000).toISOString() : new Date().toISOString(),
           blockchainHash: '',
@@ -377,8 +377,7 @@ export const BlockchainProvider = ({ children }) => {
       }
       
       throw new Error('Blockchain transaction failed');
-      
-      return newItem;
+      return;
     } catch (error) {
       console.error('Error adding produce item:', error);
       throw error;
@@ -528,6 +527,27 @@ export const BlockchainProvider = ({ children }) => {
     }
   };
 
+  const recordTransaction = async (itemId, buyer, paymentId, amount) => {
+    try {
+      if (!contract || !signer) {
+        throw new Error('Blockchain contract or signer is not initialized');
+      }
+
+      const tx = await contract.recordTransaction(itemId, buyer, paymentId, amount);
+      await tx.wait();
+      console.log('Transaction recorded successfully on blockchain:', {
+        itemId,
+        buyer,
+        paymentId,
+        amount
+      });
+      return true;
+    } catch (error) {
+      console.error('Failed to record transaction on blockchain:', error);
+      throw error;
+    }
+  };
+
   const value = {
     account,
     provider,
@@ -545,6 +565,7 @@ export const BlockchainProvider = ({ children }) => {
     transferOwnership,
     buyItem,
     rebateGasFees,
+    recordTransaction,
     ipfs
   };
 

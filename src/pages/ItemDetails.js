@@ -66,37 +66,49 @@ const ItemDetails = () => {
     fetchItemDetails();
   }, [id, produceItems, contract, getItemPaymentHistory]);
 
+  // Enhanced error handling for payment and blockchain interaction
   const handleBuyItem = async () => {
-    if (!item) return;
-    
+    if (!item) {
+      alert('Item details are missing. Cannot proceed with purchase.');
+      return;
+    }
+
     try {
-      await processPayment(item, item.price);
-      
-      // If payment successful and contract is available, buy the item on blockchain
+      // Process payment using Razorpay
+      const paymentResult = await processPayment(item, item.price);
+      console.log('Payment successful:', paymentResult);
+
       if (contract && account) {
         try {
-          await contract.buyItem(item.id, { value: ethers.utils.parseEther(item.price) });
-          alert('Item purchased successfully!');
-          // Update local state
+          // Record the transaction on the blockchain
+          const tx = await contract.recordTransaction(
+            item.id,
+            account,
+            paymentResult.paymentId, // Use Razorpay payment ID
+            paymentResult.amount // Use the amount from Razorpay
+          );
+          await tx.wait();
+          alert('Transaction recorded on blockchain successfully!');
+
+          // Update item state
           setItem(prev => ({
             ...prev,
             status: 'Sold',
             owner: account
           }));
-        } catch (error) {
-          console.error('Error buying item on blockchain:', error);
-          alert('Payment processed but blockchain transaction failed. Please contact support.');
+        } catch (blockchainError) {
+          console.error('Failed to record transaction on blockchain:', blockchainError);
+          alert(`Payment processed but failed to record transaction on blockchain. Error: ${blockchainError.message}`);
         }
       } else {
-        alert('Item purchased successfully!');
-        // Update local state
+        alert('Payment successful!');
         setItem(prev => ({
           ...prev,
           status: 'Sold'
         }));
       }
-    } catch (error) {
-      console.error('Payment error:', error);
+    } catch (paymentError) {
+      console.error('Payment error:', paymentError);
       alert('Payment failed. Please try again.');
     }
   };
@@ -195,11 +207,13 @@ const ItemDetails = () => {
                 <div className="flex items-start">
                   <User className="h-5 w-5 text-gray-500 mr-2 mt-0.5" />
                   <div>
-                    <p className="text-sm text-gray-500">Farmer</p>
-                    <p className="text-gray-800">{item.farmer}</p>
+                    <p className="text-sm text-gray-500">Farmer Account</p>
+                    <div className='flex '>
+                      <div className="text-gray-800 max-w-10">{item.farmer}</div>
+                    </div>
                   </div>
                 </div>
-                
+                <br/>
                 <div className="flex items-start">
                   <MapPin className="h-5 w-5 text-gray-500 mr-2 mt-0.5" />
                   <div>
@@ -276,7 +290,9 @@ const ItemDetails = () => {
                 
                 {item.status !== 'Sold' && (
                   <button
-                    onClick={handleBuyItem}
+                    onClick={() => {
+                      window.location.href = 'https://razorpay.me/@abhishekchoudhary5550';
+                    }}
                     className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center"
                   >
                     <ShoppingCart className="h-5 w-5 mr-2" />

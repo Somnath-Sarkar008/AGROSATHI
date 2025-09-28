@@ -71,6 +71,11 @@ const ProduceTracking = () => {
     }
   }, [searchTerm, produceItems]);
 
+  // Ensure farmer names are displayed properly in the ProduceTracking page
+  filteredItems.forEach(item => {
+    item.farmer = item.farmer || 'Unknown Farmer';
+  });
+
   const getStatusIcon = (status) => {
     switch (status) {
       case 'Harvested': return <Leaf className="h-5 w-5 text-green-600" />;
@@ -177,56 +182,55 @@ const ProduceTracking = () => {
             </form>
           </div>
 
-          {/* Search Results */}
-          <div className="card">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Results ({filteredItems.length})
-            </h3>
-            {filteredItems.length === 0 ? (
-              <div className="text-center py-8">
-                <Leaf className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-500">No produce items found</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {filteredItems.map((item) => (
-                  <div
+                <div className="card">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Results ({filteredItems.length})
+                </h3>
+                {filteredItems.length === 0 ? (
+                  <div className="text-center py-8">
+                  <Leaf className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-500">No produce items found</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                  {filteredItems.map((item) => (
+                    <div
                     key={item.id}
                     onClick={() => handleItemSelect(item)}
-                    className={`p-3 rounded-lg border cursor-pointer transition-colors duration-200 ${
+                    className={`p-4 rounded-lg shadow-sm border cursor-pointer transition-transform duration-200 transform ${
                       selectedItem?.id === item.id
-                        ? 'border-primary-300 bg-primary-50'
-                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      ? 'border-primary-400 bg-primary-50 scale-105'
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 hover:scale-105'
                     }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium text-gray-900">{item.name}</h4>
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(item.status)}`}>
-                        {item.status}
+                    >
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-medium text-gray-900 text-lg">{item.name}</h4>
+                      <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${getStatusColor(item.status)}`}>
+                      {item.status}
                       </span>
                     </div>
-                    <div className="text-sm text-gray-600 space-y-1">
+                    <div className="text-sm text-gray-600 space-y-2">
                       <div className="flex items-center">
-                        <User className="h-4 w-4 mr-1" />
-                        {item.farmer}
+                      <User className="h-4 w-4 mr-2 text-gray-500" />
+                      <span className="truncate">{item.farmer}</span>
                       </div>
                       <div className="flex items-center">
-                        <MapPin className="h-4 w-4 mr-1" />
-                        {item.location}
+                      <MapPin className="h-4 w-4 mr-2 text-gray-500" />
+                      <span className="truncate">{item.location}</span>
                       </div>
                       <div className="flex items-center">
-                        <DollarSign className="h-4 w-4 mr-1" />
-                        ${item.price}
+                      <DollarSign className="h-4 w-4 mr-2 text-gray-500" />
+                      <span>₹{item.price}/kg</span>
                       </div>
                     </div>
+                    </div>
+                  ))}
                   </div>
-                ))}
+                )}
+                </div>
               </div>
-            )}
-          </div>
-        </div>
 
-        {/* Produce Details Panel */}
+              {/* Produce Details Panel */}
         <div className="lg:col-span-2">
           {selectedItem ? (
             <div className="space-y-6">
@@ -246,7 +250,7 @@ const ProduceTracking = () => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-primary-600">${selectedItem.price}</div>
+                    <div className="text-2xl font-bold text-primary-600">₹{selectedItem.price}</div>
                     <div className="text-sm text-gray-500">per unit</div>
                   </div>
                 </div>
@@ -280,14 +284,14 @@ const ProduceTracking = () => {
                       <Package className="h-5 w-5 text-gray-400 mr-3" />
                       <div>
                         <div className="text-sm font-medium text-gray-900">Quality Grade</div>
-                        <div className="text-sm text-gray-600">{selectedItem.quality}</div>
+                        <div className="text-sm text-gray-600">{selectedItem.quality || 'Not Available'}</div>
                       </div>
                     </div>
                     <div className="flex items-center">
                       <Leaf className="h-5 w-5 text-gray-400 mr-3" />
                       <div>
                         <div className="text-sm font-medium text-gray-900">Blockchain Hash</div>
-                        <div className="text-sm text-gray-600 font-mono">{selectedItem.blockchainHash}</div>
+                        <div className="text-sm text-gray-600 font-mono">{selectedItem.timestamp}</div>
                       </div>
                     </div>
                   </div>
@@ -302,9 +306,9 @@ const ProduceTracking = () => {
                     <QRCode value={selectedItem.qrCode || JSON.stringify({ id: selectedItem.id })} size={180} />
                   </div>
                   <div className="mt-3 mx-auto max-w-sm">
-                    <div className="text-xs text-gray-600 font-mono bg-gray-50 border rounded p-2 break-all">
+                    {/* <div className="text-xs text-gray-600 font-mono bg-gray-50 border rounded p-2 break-all">
                       {selectedItem.qrCode || JSON.stringify({ id: selectedItem.id })}
-                    </div>
+                    </div> */}
                   </div>
                   <p className="text-sm text-gray-600 mt-2">
                     Scan this QR code to access produce information
@@ -355,7 +359,7 @@ const ProduceTracking = () => {
                               {payment.status}
                             </span>
                           </div>
-                          <div className="text-sm font-medium text-gray-900">${payment.amount}</div>
+                          <div className="text-sm font-medium text-gray-900">₹{payment.amount}</div>
                           <div className="text-sm text-gray-600">Transaction ID: {payment.transactionId}</div>
                           <div className="text-xs text-gray-500">{formatDate(payment.timestamp)}</div>
                         </div>

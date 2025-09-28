@@ -45,6 +45,11 @@ const Dashboard = () => {
     return matchesSearch && matchesStatus;
   });
 
+  // Ensure farmer names are displayed properly in the Dashboard page
+  filteredItems.forEach(item => {
+    item.farmer = item.farmer || 'Unknown Farmer';
+  });
+
   const stats = [
     {
       label: 'Total Produce Items',
@@ -69,8 +74,8 @@ const Dashboard = () => {
     },
     {
       label: 'Total Value',
-      value: `$${produceItems.reduce((sum, item) => sum + parseFloat(item.price), 0).toFixed(2)}`,
-      icon: DollarSign,
+      value: `₹${produceItems.reduce((sum, item) => sum + parseFloat(item.price), 0).toFixed(2)}/unit`,
+      icon: CreditCard, // Changed to CreditCard as a placeholder for INR sign
       color: 'text-orange-600',
       bgColor: 'bg-orange-50'
     },
@@ -101,9 +106,6 @@ const Dashboard = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600">
-            Welcome back! Here's an overview of your agricultural produce tracking.
-          </p>
         </div>
         <Link to="/add-produce" className="btn-primary flex items-center space-x-2">
           <Plus className="h-5 w-5" />
@@ -206,7 +208,7 @@ const Dashboard = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Price
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -235,10 +237,10 @@ const Dashboard = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${item.price}
+                      ₹{item.price}/{item.unit}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
+                      <div className="flex space-x-2 space-between justify-center">
                         <Link
                           to={`/track?id=${item.id}`}
                           className="text-primary-600 hover:text-primary-900 flex items-center"
@@ -248,15 +250,10 @@ const Dashboard = () => {
                         </Link>
                         <Link
                           to={`/item/${item.id}`}
-                          className="text-indigo-600 hover:text-indigo-900 flex items-center"
+                          className="text-indigo-600 hover:text-indigo-900 flex items-center mx-5"
                         >
-                          <DollarSign className="h-4 w-4 mr-1" />
                           Details
                         </Link>
-                        <button className="text-secondary-600 hover:text-secondary-900 flex items-center">
-                          <Edit className="h-4 w-4 mr-1" />
-                          Edit
-                        </button>
                       </div>
                     </td>
                   </tr>

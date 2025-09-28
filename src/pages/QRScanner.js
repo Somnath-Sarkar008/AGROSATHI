@@ -4,7 +4,7 @@ import { useBlockchain } from '../context/BlockchainContext';
 import { usePayment } from '../context/PaymentContext';
 import { ethers } from 'ethers';
 import QrScanner from 'qr-scanner';
-import QRCode from 'qrcode.react';
+import QRCode, { QRCodeCanvas } from 'qrcode.react';
 import { 
   Camera, 
   QrCode as QrCodeIcon, 
@@ -14,7 +14,7 @@ import {
   AlertCircle,
   Download,
   Share2,
-  ShoppingCart
+  qrCode
 } from 'lucide-react';
 
 const QRScanner = () => {
@@ -27,6 +27,11 @@ const QRScanner = () => {
   const [manualInput, setManualInput] = useState('');
   const videoRef = useRef(null);
   const qrScannerRef = useRef(null);
+
+  // Ensure farmer names are displayed properly in the produce list
+  produceItems.forEach(item => {
+    item.farmerName = item.farmerName || 'Unknown Farmer';
+  });
 
   const startScanning = async () => {
     try {
@@ -201,48 +206,48 @@ const QRScanner = () => {
     stopScanning();
   };
 
-  const downloadQRCode = () => {
-    // Generate QR code data with blockchain information
-    const qrData = scannedItem ? JSON.stringify({
+  const downloadQRCode = async () => {
+    if (!scannedItem) {
+      alert('No item selected to generate QR code.');
+      return;
+    }
+
+    const qrData = JSON.stringify({
       id: scannedItem.id,
       name: scannedItem.name,
       blockchainHash: scannedItem.blockchainHash,
       timestamp: new Date().toISOString()
-    }) : null;
-    if (scannedItem) {
-      // In a real app, you'd generate and download the QR code
-      alert('QR code download feature would be implemented here');
+    });
+
+    try {
+      const qrCodeUrl = await QRCodeCanvas.toDataURL(qrData, { width: 300 });
+      const link = document.createElement('a');
+      link.href = qrCodeUrl;
+      link.download = `${scannedItem.name || 'qr-code'}.png`;
+      link.click();
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+      alert('Failed to generate QR code. Please try again.');
     }
   };
 
   const handleBuyItem = async (item) => {
     try {
-      // Process payment first
-      await processPayment(item, item.price);
-      
-      // If payment successful and contract is available, buy the item on blockchain
-      if (contract && account) {
-        try {
-          await contract.buyItem(item.id, { value: ethers.utils.parseEther(item.price) });
-          alert('Item purchased successfully!');
-          setScannedItem(prev => ({
-            ...prev,
-            status: 'Sold',
-            owner: account
-          }));
-        } catch (error) {
-          console.error('Error buying item on blockchain:', error);
-          alert('Payment processed but blockchain transaction failed. Please contact support.');
-        }
-      } else {
-        alert('Item purchased successfully!');
+      // Use Razorpay checkout for off-chain payment
+      const paymentDetails = await processPayment(item, item.price);
+
+      if (paymentDetails.success) {
+        alert('Payment successful!');
         setScannedItem(prev => ({
           ...prev,
-          status: 'Sold'
+          status: 'Sold',
+          owner: account // Update owner if necessary
         }));
+      } else {
+        alert('Payment failed. Please try again.');
       }
     } catch (error) {
-      console.error('Payment error:', error);
+      console.error('Error during payment:', error);
       alert('Payment failed. Please try again.');
     }
   };
@@ -400,7 +405,10 @@ const QRScanner = () => {
                 Share
               </button>
               <button
-                onClick={() => handleBuyItem(scannedItem)}
+                onClick={() => {
+                  window.location.href = 'https://razorpay.me/@abhishekchoudhary5550';
+                }}
+                // onDoubleClick={handleBuyItem}
                 className="ml-4 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center"
               >
                 Buy Now

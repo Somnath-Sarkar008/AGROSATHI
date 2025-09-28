@@ -66,39 +66,51 @@ export const PaymentProvider = ({ children }) => {
     }
   };
 
-  // Process payment with Razorpay
+  // Enhanced Razorpay payment handling
   const processPayment = async (produceData, amount) => {
     setIsLoading(true);
-    
+
     try {
       // Create payment order
       const order = await createPaymentOrder(produceData, amount);
-      
+
       // Configure Razorpay options
       const options = {
         key: razorpayKey,
         amount: order.amount,
         currency: order.currency,
         name: 'AgriChain',
-        description: `Registration for ${produceData.name}`,
+        description: `Payment for ${produceData.name}`,
         order_id: order.id,
         handler: async (response) => {
-          // Payment successful - add to blockchain
-          await handlePaymentSuccess(response, produceData, order);
-          
-          // If blockchain contract is available, rebate gas fees
-          if (contract && account) {
-            try {
-              await rebateGasFees(produceData.id, account);
-            } catch (error) {
-              console.error('Error rebating gas fees:', error);
-            }
+          try {
+            // Payment successful - update produce status
+            await updateProduceStatus(produceData.id, 'Sold', produceData.location);
+
+            const paymentDetails = {
+              paymentId: response.razorpay_payment_id,
+              amount: order.amount / 100, // Convert back from paise
+              currency: order.currency,
+              status: 'completed',
+              timestamp: new Date().toISOString(),
+              produceData: produceData
+            };
+
+            // Add to payment history
+            setPaymentHistory(prev => [...prev, paymentDetails]);
+            setIsLoading(false);
+            return paymentDetails;
+          } catch (successError) {
+            console.error('Error handling payment success:', successError);
+            alert('Payment processed but post-payment actions failed. Please contact support.');
+            setIsLoading(false);
+            throw successError;
           }
         },
         prefill: {
-          name: produceData.farmer,
-          email: 'farmer@agrichain.in',
-          contact: '+91XXXXXXXXXX'
+          name: produceData.farmer || 'Unknown Farmer',
+          email: produceData.email || 'farmer@agrichain.in',
+          contact: produceData.contact || '+91XXXXXXXXXX'
         },
         theme: {
           color: '#4F46E5' // Indigo color to match UI
@@ -106,6 +118,7 @@ export const PaymentProvider = ({ children }) => {
         modal: {
           ondismiss: () => {
             setIsLoading(false);
+            alert('Payment modal dismissed. No transaction was completed.');
           }
         }
       };
@@ -113,10 +126,10 @@ export const PaymentProvider = ({ children }) => {
       // Initialize Razorpay
       const razorpay = new window.Razorpay(options);
       razorpay.open();
-
     } catch (error) {
       console.error('Payment error:', error);
       setIsLoading(false);
+      alert('Payment failed. Please try again.');
       throw new Error('Payment failed. Please try again.');
     }
   };
